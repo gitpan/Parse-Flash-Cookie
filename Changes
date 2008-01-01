@@ -1,6 +1,10 @@
 Revision history for Parse-Flash-Cookie
 
-# 	$Id: Changes 38 2007-12-20 07:18:45Z aff $	
+#   $Id: Changes 68 2008-01-01 20:11:39Z aff $
+
+0.02    2008-01-01
+        Renamed function parse to to_text.
+        Added XML support.
 
 0.01    2007-12-12
         Initial version.

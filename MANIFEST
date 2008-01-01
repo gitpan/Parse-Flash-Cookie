@@ -17,9 +17,9 @@ data/v4_UserCredentials.sol
 data/video.sol
 lib/Parse/Flash/Cookie.pm
 t/00-load.t
-t/00-load.t
 t/01-nofile.t
-t/02-parse.t
+t/02-to_text.t
+t/03-to_xml.t
 t/boilerplate.t
 t/pod-coverage.t
 t/pod.t

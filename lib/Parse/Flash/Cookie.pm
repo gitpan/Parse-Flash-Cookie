@@ -1,13 +1,14 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 48 2007-12-20 08:30:22Z aff $
+#   $Id: Cookie.pm 61 2007-12-29 21:21:15Z aff $
 
 use strict;
 use warnings;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 use Log::Log4perl;
+use XML::Writer;
 
 use constant LENGTH_OF_FLOAT   => 8;
 use constant LENGTH_OF_INTEGER => 2;
@@ -24,8 +25,9 @@ my $conf = q(
 Log::Log4perl::init( \$conf );
 my $log  = Log::Log4perl::->get_logger(q(sol.parser));
 
-my $file = undef;
-my $FH   = undef;
+my $file   = undef;
+my $FH     = undef;
+my $writer = undef;
 
 my %datatype = (
                 0x0 => 'number',
@@ -42,15 +44,37 @@ my %datatype = (
                 0x10 => 'object-customclass',
                );
 
-#  Parse and return type and value as list.
-#  Expects to be called in list context.
+# Add an XML element to current document.  Do nothing if $writer is
+# undef. Return true.
+sub _addXMLElem {
+
+  # Skip if not XML mode
+  return unless $writer;
+
+  my ($type, $name, $value) = @_;
+  $writer->startTag(
+                    'data',
+                    'type' => $type,
+                    'name' => $name,
+                   );
+
+  $writer->characters($value) if (defined($value));
+  $writer->endTag();
+
+  return 1;
+}
+
+#  Parse and return type and value as list.  Expects to be called in
+# list context.  Argument name is passed in order to have the
+# individual subs create XML elements themselves.
 sub _getTypeAndValue {
+  my $name = shift;
 
   $log->logdie("expected to be called in LIST context") if !wantarray();
 
   # Read data type
   my $value = undef;
-  my $type = _getBytes(1);
+  my $type = _readBytes(1);
   my $type_as_txt = $datatype{$type};
   if (!exists($datatype{$type})) {
     $log->warn(qq{Missing datatype for '$type'!}) if $log->is_warn();
@@ -58,25 +82,27 @@ sub _getTypeAndValue {
 
   # Read element depending on type
   if($type == 0) {
-    $value =  _getFloat();
+    $value =  _getFloat($name);
   } elsif($type == 1){
-    $value =  _getBytes(1);
+    $value =  _getBool($name);
   } elsif ($type == 2) {
-    $value =  _getString();
+    $value =  _getString($name);
   } elsif($type == 3){
-    $value =  _getObject();
+    $value =  _getObject($name);
   } elsif($type == 5) {   # null
     $value = undef;
+    _addXMLElem('null', $name);
   } elsif($type == 6) {   # undef
     $value = undef;
+    _addXMLElem('undef', $name);
   } elsif($type == 8){    # array
-    $value = _getArray();
+    $value = _getArray($name);
   } elsif($type == 0xb){  # date
     $log->logdie("Not implemented yet: date");
   } elsif($type == 0xf){  # doublestring
     $log->logdie("Not implemented yet: doublestring");
   } elsif($type == 0x10){ # customclass
-    $value = _getObject(1);
+    $value = _getObject($name, 1);
   } else {
     $log->logdie("Unknown type:$type" );
   }
@@ -84,59 +110,80 @@ sub _getTypeAndValue {
   return ($type_as_txt, $value);
 }
 
-# Parse object and return contents as comma separated string. If
-# customClass argument is given then read two strings instead of one.
+# Parse object and return contents as comma separated string.
 sub _getObject {
+  my $name = shift;
   my $customClass = shift;
   my @retvals = ();
+  $writer->startTag(
+    'data',
+    'type'   => 'object',
+    'name'   => $name,
+  ) if $writer;
+
+ LOOP:
   while (eof($FH) != 1) {
     # Read until end flag is detected : 00 00 09
-    if (_getraw(3) eq END_OF_OBJECT) {
-      return join(q{,}, @retvals);
+    if (_readRaw(3) eq END_OF_OBJECT) {
+      #return join(q{,}, @retvals);
+      last LOOP;
     }
 
     # "un-read" the 3 bytes
     seek($FH, -3, 1) or $log->logdie("seek failed");
 
     # Read name
-    my $name = _getString();
+    $name = _readString();
     $log->debug(qq{name:$name}) if $log->is_debug();
 
     # Read 2nd name if customClass is set
     if ($customClass) {
       push @retvals, q{class_name=} . $name . q{;};
-      my $name = _getString();
+      $name = _readString();
       $log->debug(qq{name:$name (2nd name - customClass)}) if $log->is_debug();
       $customClass = 0;
     }
 
     # Get data type and value
-    my ($type, $value) = _getTypeAndValue();
+    my ($type, $value) = _getTypeAndValue($name);
     $log->debug(qq{type:$type value:$value}) if $log->is_debug();
 
     push @retvals, $name . q{;} . $value;
   }
-  $log->logdie("Syntax error: reached end-of-file before end-of-object");
+
+  $writer->endTag() if $writer;
+
+  return join(q{,}, @retvals);
 }
+
 
 # Parse array and return contents as comma separated string.
 sub _getArray {
+  my $name = shift;
+
   my @retvals = ();
-  my $count = _getlong();
-  if($count == 0) {
+  my $length = _readLong();
+  if($length == 0) {
     return _getObject();
   }
 
+  $writer->startTag(
+    'data',
+    'type'   => 'array',
+    'length' => $length,
+    'name'   => $name,
+  ) if $writer;
+
  ELEMENT:
-  while ($count-- > 0) {
-    my $name = _getString();
+  while ($length-- > 0) {
+    $name = _readString();
 
     if (!defined($name)) {
       last ELEMENT;
     }
 
     my $retval = undef;
-    my ($type, $value) = _getTypeAndValue();
+    my ($type, $value) = _getTypeAndValue($name);
     {
       no warnings q{uninitialized}; # allow undef values
       $log->debug(qq{$name;$type;$value}) if $log->is_debug();
@@ -145,8 +192,10 @@ sub _getArray {
     push @retvals, $retval;
   }
 
+  $writer->endTag() if $writer;
+
   # Now expect END_OF_OBJECT tag to be next
-  if (_getraw(3) eq END_OF_OBJECT) {
+  if (_readRaw(3) eq END_OF_OBJECT) {
     return join(q{,}, @retvals);
   }
 
@@ -154,8 +203,12 @@ sub _getArray {
   return;
 }
 
+#################################
+
+# Utility functions - does not generate XML output
+
 # Parse and return a given number of bytes (unformatted)
-sub _getraw {
+sub _readRaw {
   my $len = shift;
   $log->logdie("missing length argument") unless $len;
   my $buffer = undef;
@@ -164,7 +217,7 @@ sub _getraw {
 }
 
 # Parse and return a given number of bytes (as singed char)
-sub _getBytes {
+sub _readBytes {
   my $len = shift || 1;
   my $buffer = undef;
   my $num = read($FH, $buffer, $len);
@@ -174,25 +227,28 @@ sub _getBytes {
 # Parse and return a string: The first 2 bytes contains the string
 # length, succeeded by the string itself. Read length first unless
 # length is given, otherwise read the given number of bytes.
-sub _getString {
+sub _readString {
   my $len = shift;
   my $buffer = undef;
   my $num = undef;
 
   # read length from filehandle unless set
-  $len = join(q{}, _getBytes(2)) unless ($len);
+  $len = join(q{}, _readBytes(2)) unless ($len);
 
   # return undef if length is zero
   return unless $len;
 
   $log->debug(qq{len:$len}) if $log->is_debug();
   $num = read($FH, $buffer, $len);
-  $log->debug(qq{buffer:$buffer}) if $log->is_debug();
+  if ($log->is_debug()) {
+    use URI::Escape; # to safely display buffer in debug mode
+    $log->debug(qq{buffer:} . uri_escape($buffer));
+  }
   return $buffer;
 }
 
 # Parse and return integer number, default 2 bytes
-sub _getint {
+sub _readInt {
   my $len = shift || LENGTH_OF_INTEGER;
   my $buffer = undef;
   my $num = read($FH, $buffer, $len);
@@ -200,7 +256,7 @@ sub _getint {
 }
 
 # Parse and return long integer number, default 4 bytes
-sub _getlong {
+sub _readLong {
   my $len = shift || LENGTH_OF_LONG;
   my $buffer = undef;
   my $num = read($FH, $buffer, $len);
@@ -208,37 +264,71 @@ sub _getlong {
 }
 
 # Parse and return floating point number: default 8 bytes
-sub _getFloat {
+sub _readFloat {
   my $len = shift || LENGTH_OF_FLOAT;
   my $buffer = undef;
   my $num = read($FH, $buffer, $len);
   return unpack 'd*', reverse $buffer;
 }
 
+#################################
+
+### Functions that gets data and creates XML output
+
+# Get next boolean element. Return the element's value. Add XML node
+# if in XML mode
+sub _getBool {
+  my $name = shift;
+  my $value = _readBytes(1);
+  _addXMLElem('boolean', $name, $value);
+  return $value;
+}
+
+# Get next string element. Return the element's value. Add XML node
+# if in XML mode
+sub _getString {
+  my $name = shift;
+  my $value = _readString();
+  _addXMLElem('string', $name, $value);
+  return $value;
+}
+
+# Return floating point number - create XML
+sub _getFloat {
+  my $name = shift;
+  my $value = _readFloat();
+  _addXMLElem('number', $name, $value); # Yes it's called number, not float
+  return $value;
+}
+
+
+##################################################################
+
+
 # Parse and return file header - 16 bytes in total. Return name if
 # file starts with sol header, otherwise undef.  Failure means the
 # 'TCSO' tag is missing.
-sub _readHeader {
+sub _getHeader {
 
   # skip first 6 bytes
-  _getString(6);
+  _readString(6);
 
   # next 4 bytes should contain 'TSCO' tag
-  if (_getString(4) ne q{TCSO}) {
+  if (_readString(4) ne q{TCSO}) {
     $log->error("missing TCSO - not a sol file") if $log->is_error();
     return; # failure
   }
 
   # Skip next 7 bytes
-  _getString(7);
+  _readString(7);
 
   # Read next byte (length of name) + the name
-  my $name = _getString(_getint(1));
+  my $name = _readString(_readInt(1));
 
   $log->debug("name:$name") if $log->is_debug();
 
   # Skip next 4 bytes
-  _getString(4);
+  _readString(4);
 
   return $name; # ok
 }
@@ -246,17 +336,17 @@ sub _readHeader {
 # Parse and return an element. In scalar context, return element
 # content as semi colon separated string, in list context return
 # element's name, type and value as a list.
-sub _readElement {
+sub _getElem {
   my $retval = undef;
 
   # Read element length and name
-  my $name = _getString(_getint(2));
+  my $name = _readString(_readInt(2));
 
   # Read data type and value
-  my ($type, $value) = _getTypeAndValue();
+  my ($type, $value) = _getTypeAndValue($name);
 
   # Read trailer (single byte)
-  my $trailer = _getBytes(1);
+  my $trailer = _readBytes(1);
   if ($trailer != 0) {
     $log->warn(qq{Expected 00 trailer, got '$trailer'}) if $log->is_warn();
   }
@@ -275,8 +365,8 @@ sub _readElement {
 
 }
 
-# parse file and return contents as a list
-sub parse {
+# parse file and return contents as a textual list
+sub to_text {
   my $file = shift;
 
   $log->logdie( q{Missing argument file.}) if (!$file);
@@ -291,12 +381,12 @@ sub parse {
   my @retvals = ();
 
   # Read header
-  my $name = _readHeader() or $log->logdie("Invalid sol header");
+  my $name = _getHeader() or $log->logdie("Invalid sol header");
   push @retvals, $name;
 
   # Read data elements
   while (eof($FH) != 1) {
-    my $string = _readElement();
+    my $string = _getElem();
     push @retvals, $string;
   }
 
@@ -305,6 +395,44 @@ sub parse {
   return @retvals;
 }
 
+# Parse file and return contents as a scalar containing XML
+# representing the file's content
+sub to_xml {
+  my $file = shift;
+
+  $log->logdie( q{Missing argument file.}) if (!$file);
+  $log->logdie(qq{No such file '$file'})  if (! -f $file);
+
+  $log->debug("start") if $log->is_debug();
+
+  open($FH,"< $file") || $log->logdie("Error opening file $file");
+  $log->debug(qq{file:$file}) if $log->is_debug();
+  binmode($FH);
+
+  my $output = undef;
+  $writer = new XML::Writer(OUTPUT => \$output, DATA_MODE => 1, DATA_INDENT => 4 );
+
+  # Read header
+  my $headername = _getHeader() or $log->logdie("Invalid sol header");
+
+  $writer->startTag(
+                    'sol',
+                    'name'       => $headername,
+                    'created_by' => __PACKAGE__,
+                    'version'    => $VERSION
+                   );
+
+  # Read data elements
+  while (eof($FH) != 1) {
+    my ($name, $type, $value) = _getElem();
+  }
+
+  close($FH) or $log->logdie(q{failed to close filehandle!});
+  $writer->endTag('sol');
+  $writer->end();
+
+  return $output;
+}
 
 1;
 
@@ -319,8 +447,11 @@ Parse::Flash::Cookie - A flash cookie parser.
 =head1 SYNOPSIS
 
   use Parse::Flash::Cookie;
-  my @content = Parse::Flash::Cookie::parse("data/settings.sol");
+  my @content = Parse::Flash::Cookie::to_text("settings.sol");
   print join("\n", @content);
+
+  my $xml = Parse::Flash::Cookie::to_xml("settings.sol");
+  print $xml;
 
 =head1 DESCRIPTION
 
@@ -328,6 +459,26 @@ Local Shared Object (LSO), sometimes known as flash cookies, is a
 cookie-like data entity used by Adobe Flash Player.  LSOs are stored
 as files on the local file system with the I<.sol> extension.  This
 module reads a Local Shared Object file and return content as a list.
+
+=head1 FUNCTIONS
+
+=over
+
+=item to_text
+
+Parses file and return contents as a textual list.
+
+=back
+
+=over
+
+=item to_xml
+
+Parses file and return contents as a scalar containing XML
+representing the file's content.
+
+=back
+
 
 =head1 SOL DATA FORMAT
 
@@ -373,8 +524,6 @@ Each element has the following structure:
 =back
 
 =head1 TODO
-
-=head2 Support I<XML> output
 
 =head2 Add support for datatypes I<date> and I<doublestring>.
 

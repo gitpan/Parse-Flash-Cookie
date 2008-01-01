@@ -1,6 +1,6 @@
 #!perl -T
 
-#   $Id: 02_parse.t 32 2007-12-19 13:25:33Z aff $
+#   $Id: 02-to_text.t 62 2007-12-29 21:22:05Z aff $
 
 use warnings;
 use strict;
@@ -24,7 +24,7 @@ ok(1);
   %file2content = (
     'A_Browser.sol'               => [qw(A_Browser lastViewedFeatureIndex;number;1)],
     'Synergy_Area.sol'            => [qw(Synergy_Area lastViewedFeatureIndex;number;1)],
-    'TestMovie_Config_Info.sol'   => [qw(TestMovie_Config_Info config;object-customclass;class_name=NetDebugConfig;,NetDebugConfig;1,client;class_name=NetDebugConfig;,NetDebugConfig;1,trace;1,recordset;1,http;1,rtmp;1,realtime_server;class_name=NetDebugConfig;,NetDebugConfig;1,trace;1,app_server;class_name=NetDebugConfig;,NetDebugConfig;1,trace;1,error;1,recordset;1,httpheaders;0,amf;0,amfheaders;0,coldfusion;1)],
+    'TestMovie_Config_Info.sol'   => [qw(TestMovie_Config_Info config;object-customclass;class_name=NetDebugConfig;,m_debug;1,client;class_name=NetDebugConfig;,m_debug;1,trace;1,recordset;1,http;1,rtmp;1,realtime_server;class_name=NetDebugConfig;,m_debug;1,trace;1,app_server;class_name=NetDebugConfig;,m_debug;1,trace;1,error;1,recordset;1,httpheaders;0,amf;0,amfheaders;0,coldfusion;1)],
     'clearspring.sol'             => [qw(clearspring userId;string;470f65bcd2e75653 sessions;object;470f65ea2bea2428;ver=0%2E7%2E8 events;object;470f65ea2bea2428;0;array;0;number;34,1;number;1192191468014,2;undefined; lastHeartbeat;object;470f65ea2bea2428;1192191476467 loadTime;object;470f65ea2bea2428;1192191466276 servers;object;470f65ea2bea2428;cs40.clearspring.com:80 newPlacements;object;470f65ea2bea2428;0 clicks;object;470f65ea2bea2428;0 clickmap;object;470f65ea2bea2428; interactionTimes;object;470f65ea2bea2428;0 versions;object; )],
     'lastPart.sol'                => [qw(lastPart lastPart_nr;number;1)],
     'mediaPlayerUserSettings.sol' => [qw (mediaPlayerUserSettings volume;number;1 smoothing;boolean;0 sizeMode;string;fit )],
@@ -55,9 +55,10 @@ foreach my $file (sort keys %file2content) {
     # check content of test file
     my @content      = ();
     eval {
-      @content = Parse::Flash::Cookie::parse($file_with_path);
+      @content = Parse::Flash::Cookie::to_text($file_with_path);
     };
-    ok($@ eq q{}, qq{parse died when parsing '$file_with_path'});
+    ok($@ eq q{}, qq{to_text died when parsing '$file_with_path'}) or 
+			diag(q{Error message: } . $@);
 
     eq_or_diff \@content, $file2content{$file}, "testing $file_with_path content ";
   }
