@@ -1,14 +1,15 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 61 2007-12-29 21:21:15Z aff $
+#   $Id: Cookie.pm 73 2008-01-04 06:42:59Z aff $
 
 use strict;
 use warnings;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 use Log::Log4perl;
-use XML::Writer;
+use XML::Writer;   # to create XML output
+use URI::Escape;   # to safely display buffer in debug mode
 
 use constant LENGTH_OF_FLOAT   => 8;
 use constant LENGTH_OF_INTEGER => 2;
@@ -82,26 +83,34 @@ sub _getTypeAndValue {
 
   # Read element depending on type
   if($type == 0) {
+		$log->debug(q{float}) if $log->is_debug();
     $value =  _getFloat($name);
   } elsif($type == 1){
+		$log->debug(q{bool}) if $log->is_debug();
     $value =  _getBool($name);
   } elsif ($type == 2) {
+		$log->debug(q{string}) if $log->is_debug();
     $value =  _getString($name);
   } elsif($type == 3){
+		$log->debug(q{object}) if $log->is_debug();
     $value =  _getObject($name);
   } elsif($type == 5) {   # null
+		$log->debug(q{null}) if $log->is_debug();
     $value = undef;
     _addXMLElem('null', $name);
   } elsif($type == 6) {   # undef
+		$log->debug(q{undef}) if $log->is_debug();
     $value = undef;
     _addXMLElem('undef', $name);
   } elsif($type == 8){    # array
+		$log->debug(q{array}) if $log->is_debug();
     $value = _getArray($name);
   } elsif($type == 0xb){  # date
     $log->logdie("Not implemented yet: date");
   } elsif($type == 0xf){  # doublestring
     $log->logdie("Not implemented yet: doublestring");
   } elsif($type == 0x10){ # customclass
+		$log->debug(q{customclass}) if $log->is_debug();
     $value = _getObject($name, 1);
   } else {
     $log->logdie("Unknown type:$type" );
@@ -221,7 +230,7 @@ sub _readBytes {
   my $len = shift || 1;
   my $buffer = undef;
   my $num = read($FH, $buffer, $len);
-  return unpack("c*", $buffer);
+  return unpack("C*", $buffer);
 }
 
 # Parse and return a string: The first 2 bytes contains the string
@@ -241,7 +250,6 @@ sub _readString {
   $log->debug(qq{len:$len}) if $log->is_debug();
   $num = read($FH, $buffer, $len);
   if ($log->is_debug()) {
-    use URI::Escape; # to safely display buffer in debug mode
     $log->debug(qq{buffer:} . uri_escape($buffer));
   }
   return $buffer;
@@ -252,7 +260,7 @@ sub _readInt {
   my $len = shift || LENGTH_OF_INTEGER;
   my $buffer = undef;
   my $num = read($FH, $buffer, $len);
-  return unpack 'c*', reverse $buffer;
+  return unpack 'C*', reverse $buffer;
 }
 
 # Parse and return long integer number, default 4 bytes
@@ -260,7 +268,7 @@ sub _readLong {
   my $len = shift || LENGTH_OF_LONG;
   my $buffer = undef;
   my $num = read($FH, $buffer, $len);
-  return unpack 'c*', reverse $buffer;
+  return unpack 'C*', reverse $buffer;
 }
 
 # Parse and return floating point number: default 8 bytes
@@ -311,6 +319,7 @@ sub _getFloat {
 sub _getHeader {
 
   # skip first 6 bytes
+  $log->debug(q{header: skip first 6 bytes}) if $log->is_debug();
   _readString(6);
 
   # next 4 bytes should contain 'TSCO' tag
@@ -320,14 +329,15 @@ sub _getHeader {
   }
 
   # Skip next 7 bytes
+  $log->debug(q{header: skip next 7 bytes}) if $log->is_debug();
   _readString(7);
 
   # Read next byte (length of name) + the name
   my $name = _readString(_readInt(1));
-
   $log->debug("name:$name") if $log->is_debug();
 
   # Skip next 4 bytes
+  $log->debug(q{header: skip next 4 bytes}) if $log->is_debug();
   _readString(4);
 
   return $name; # ok
@@ -341,6 +351,7 @@ sub _getElem {
 
   # Read element length and name
   my $name = _readString(_readInt(2));
+	#$log->debug(qq{element name:$name}) if $log->is_debug();
 
   # Read data type and value
   my ($type, $value) = _getTypeAndValue($name);
@@ -386,6 +397,7 @@ sub to_text {
 
   # Read data elements
   while (eof($FH) != 1) {
+		$log->debug(q{read element}) if $log->is_debug();
     my $string = _getElem();
     push @retvals, $string;
   }
@@ -424,6 +436,7 @@ sub to_xml {
 
   # Read data elements
   while (eof($FH) != 1) {
+		$log->debug(q{read element}) if $log->is_debug();
     my ($name, $type, $value) = _getElem();
   }
 
