@@ -3,13 +3,16 @@ MANIFEST
 Makefile.PL
 README
 data/A_Browser.sol
+data/MFTPMetaGameSo.sol
 data/Synergy_Area.sol
 data/TestMovie_Config_Info.sol
 data/base_test.sol
 data/clearspring.sol
 data/fpv.sol
+data/ivillagee.sol
 data/lastPart.sol
 data/mediaPlayerUserSettings.sol
+data/p3dagen.sol
 data/pointer.sol
 data/revverplayer.sol
 data/settings.sol

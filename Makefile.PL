@@ -6,7 +6,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
   NAME          => 'Parse::Flash::Cookie',
-  VERSION       => 0.04,
+  VERSION       => 0.05,
   AUTHOR        => 'Andreas Faafeng <aff@cpan.org>',
   VERSION_FROM  => 'lib/Parse/Flash/Cookie.pm',
   ABSTRACT_FROM => 'lib/Parse/Flash/Cookie.pm',

@@ -1,22 +1,17 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 110 2008-01-17 08:23:28Z aff $
+#   $Id: Cookie.pm 128 2008-01-17 13:27:57Z aff $
 
 use strict;
 use warnings;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 use Log::Log4perl;
 use XML::Writer;   # to create XML output
 use URI::Escape;   # to safely display buffer in debug mode
 use DateTime;
 use Config;        # to determine endianness
-
-my $is_little_endian = undef;
-BEGIN {
-   $is_little_endian = ( $Config{byteorder} =~ qr/^1234/ ) ? 1 : 0;
-}
 
 use constant LENGTH_OF_SHORT   => 2;
 use constant LENGTH_OF_INTEGER => 2;
@@ -54,6 +49,12 @@ my %datatype = (
                 0x10 => 'object-customclass',
                );
 
+# Return true if architecture is little-endian, otherwise false
+sub _is_little_endian {
+	return ( $Config{byteorder} =~ qr/^1234/ ) ? 1 : 0;
+}
+
+
 # Add an XML element to current document.  Do nothing if $writer is
 # undef. Return true.
 sub _addXMLElem {
@@ -83,8 +84,8 @@ sub _getTypeAndValue {
   $log->logdie("expected to be called in LIST context") if !wantarray();
 
   # Read data type
-  my $value = undef;
-  my $type = _readBytes(1);
+  my $value       = undef;
+  my $type        = _readBytes(1);
   my $type_as_txt = $datatype{$type};
   if (!exists($datatype{$type})) {
     $log->warn(qq{Missing datatype for '$type'!}) if $log->is_warn();
@@ -167,9 +168,12 @@ sub _getObject {
 
     # Get data type and value
     my ($type, $value) = _getTypeAndValue($name);
-    $log->debug(qq{type:$type value:$value}) if $log->is_debug();
 
-    push @retvals, $name . q{;} . $value;
+		{
+			no warnings q{uninitialized};  # allow undefined values
+			$log->debug(qq{type:$type value:$value}) if $log->is_debug();
+			push @retvals, $name . q{;} . $value;
+		}
   }
 
   $writer->endTag() if $writer;
@@ -248,7 +252,7 @@ sub _readString {
   $log->debug(qq{len not given as arg}) if $log->is_debug() && !$len;
 
   # read length from filehandle unless set
-  $len = join(q{}, _readBytes(2)) unless ($len);
+  $len = join(q{}, _readShort(2)) unless ($len);
 
   # return undef if length is zero
   return unless $len;
@@ -274,9 +278,9 @@ sub _readSignedShort {
   my $len    = shift || LENGTH_OF_SHORT;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
-  return ($is_little_endian)
-    ? unpack 's*', reverse $buffer
-    : unpack 's*', $buffer;
+  (_is_little_endian())
+    ? return unpack 's*', reverse $buffer
+    : return unpack 's*', $buffer;
 }
 
 # Parse and return short (integer) number, default 2 bytes
@@ -284,9 +288,9 @@ sub _readShort {
   my $len    = shift || LENGTH_OF_SHORT;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
-  return ($is_little_endian)
-    ? unpack 'S*', reverse $buffer
-    : unpack 'S*', $buffer;
+  (_is_little_endian())
+    ? return unpack 'S*', reverse $buffer
+    : return unpack 'S*', $buffer;
 }
 
 # Parse and return integer number, default 2 bytes
@@ -294,9 +298,9 @@ sub _readInt {
   my $len    = shift || LENGTH_OF_INTEGER;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
-  return ($is_little_endian)
-    ? unpack 'C*', reverse $buffer
-    : unpack 'C*', $buffer;
+  (_is_little_endian())
+    ? return unpack 'C*', reverse $buffer
+    : return unpack 'C*', $buffer;
 }
 
 # Parse and return long integer number, default 4 bytes
@@ -304,9 +308,9 @@ sub _readLong {
   my $len    = shift || LENGTH_OF_LONG;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
-  return ($is_little_endian)
-    ? unpack 'C*', reverse $buffer
-    : unpack 'C*', $buffer;
+  (_is_little_endian())
+    ? return unpack 'C*', reverse $buffer
+    : return unpack 'C*', $buffer;
 }
 
 # Parse and return floating point number: default 8 bytes
@@ -314,9 +318,9 @@ sub _readFloat {
   my $len    = shift || LENGTH_OF_FLOAT;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
-  return ($is_little_endian)
-    ? unpack 'd*', reverse $buffer
-    : unpack 'd*', $buffer;
+  (_is_little_endian())
+    ? return unpack 'd*', reverse $buffer
+    : return unpack 'd*', $buffer;
 }
 
 #################################
@@ -587,7 +591,7 @@ representing the file's content.
 
 =head1 SOL DATA FORMAT
 
-The SOL files use a binary encoding that are I<little-endian>
+The SOL files use a binary encoding that is I<little-endian>
 regardless of platform architecture. This means the SOL files are
 platform independent, but they have to be interpreted differently on
 I<little-endian> and I<big-endian> platforms.  See L<perlport> for
