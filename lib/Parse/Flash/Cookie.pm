@@ -1,19 +1,27 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 73 2008-01-04 06:42:59Z aff $
+#   $Id: Cookie.pm 110 2008-01-17 08:23:28Z aff $
 
 use strict;
 use warnings;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 use Log::Log4perl;
 use XML::Writer;   # to create XML output
 use URI::Escape;   # to safely display buffer in debug mode
+use DateTime;
+use Config;        # to determine endianness
 
-use constant LENGTH_OF_FLOAT   => 8;
+my $is_little_endian = undef;
+BEGIN {
+   $is_little_endian = ( $Config{byteorder} =~ qr/^1234/ ) ? 1 : 0;
+}
+
+use constant LENGTH_OF_SHORT   => 2;
 use constant LENGTH_OF_INTEGER => 2;
 use constant LENGTH_OF_LONG    => 4;
+use constant LENGTH_OF_FLOAT   => 8;
 use constant END_OF_OBJECT     => "\x00\x00\x09";
 
 my $conf = q(
@@ -21,7 +29,7 @@ my $conf = q(
   log4perl.appender.ScreenAppender         = Log::Log4perl::Appender::Screen
   log4perl.appender.ScreenAppender.stderr  = 0
   log4perl.appender.ScreenAppender.layout  = PatternLayout
-  log4perl.appender.ScreenAppender.layout.ConversionPattern=[%p] %d %M:%L  %m%n
+  log4perl.appender.ScreenAppender.layout.ConversionPattern=[%p] %m%n
 );
 Log::Log4perl::init( \$conf );
 my $log  = Log::Log4perl::->get_logger(q(sol.parser));
@@ -37,9 +45,10 @@ my %datatype = (
                 0x3 => 'object',
                 0x5 => 'null',
                 0x6 => 'undefined',
+                0x7 => 'pointer',
                 0x8 => 'array',
                 0xa => 'raw-array',
-                0xb => 'object-date',
+                0xb => 'date',
                 0xd => 'object-string-number-boolean-textformat',
                 0xf => 'object-xml',
                 0x10 => 'object-customclass',
@@ -83,34 +92,37 @@ sub _getTypeAndValue {
 
   # Read element depending on type
   if($type == 0) {
-		$log->debug(q{float}) if $log->is_debug();
+    $log->debug(q{float}) if $log->is_debug();
     $value =  _getFloat($name);
   } elsif($type == 1){
-		$log->debug(q{bool}) if $log->is_debug();
+    $log->debug(q{bool}) if $log->is_debug();
     $value =  _getBool($name);
   } elsif ($type == 2) {
-		$log->debug(q{string}) if $log->is_debug();
+    $log->debug(q{string}) if $log->is_debug();
     $value =  _getString($name);
   } elsif($type == 3){
-		$log->debug(q{object}) if $log->is_debug();
+    $log->debug(q{object}) if $log->is_debug();
     $value =  _getObject($name);
   } elsif($type == 5) {   # null
-		$log->debug(q{null}) if $log->is_debug();
+    $log->debug(q{null}) if $log->is_debug();
     $value = undef;
     _addXMLElem('null', $name);
   } elsif($type == 6) {   # undef
-		$log->debug(q{undef}) if $log->is_debug();
+    $log->debug(q{undef}) if $log->is_debug();
     $value = undef;
     _addXMLElem('undef', $name);
+  } elsif($type == 7){    # pointer
+    $log->debug(q{pointer}) if $log->is_debug();
+    $value = _getPointer($name);
   } elsif($type == 8){    # array
-		$log->debug(q{array}) if $log->is_debug();
+    $log->debug(q{array}) if $log->is_debug();
     $value = _getArray($name);
   } elsif($type == 0xb){  # date
-    $log->logdie("Not implemented yet: date");
+    $value = _getDate($name);
   } elsif($type == 0xf){  # doublestring
     $log->logdie("Not implemented yet: doublestring");
   } elsif($type == 0x10){ # customclass
-		$log->debug(q{customclass}) if $log->is_debug();
+    $log->debug(q{customclass}) if $log->is_debug();
     $value = _getObject($name, 1);
   } else {
     $log->logdie("Unknown type:$type" );
@@ -218,28 +230,22 @@ sub _getArray {
 
 # Parse and return a given number of bytes (unformatted)
 sub _readRaw {
-  my $len = shift;
+  my $len    = shift;
   $log->logdie("missing length argument") unless $len;
   my $buffer = undef;
-  my $num = read($FH, $buffer, $len);
+  my $num    = read($FH, $buffer, $len);
   return $buffer;
-}
-
-# Parse and return a given number of bytes (as singed char)
-sub _readBytes {
-  my $len = shift || 1;
-  my $buffer = undef;
-  my $num = read($FH, $buffer, $len);
-  return unpack("C*", $buffer);
 }
 
 # Parse and return a string: The first 2 bytes contains the string
 # length, succeeded by the string itself. Read length first unless
 # length is given, otherwise read the given number of bytes.
 sub _readString {
-  my $len = shift;
+  my $len    = shift;
   my $buffer = undef;
-  my $num = undef;
+  my $num    = undef;
+
+  $log->debug(qq{len not given as arg}) if $log->is_debug() && !$len;
 
   # read length from filehandle unless set
   $len = join(q{}, _readBytes(2)) unless ($len);
@@ -255,39 +261,80 @@ sub _readString {
   return $buffer;
 }
 
+# Parse and return a given number of bytes
+sub _readBytes {
+  my $len    = shift || 1;
+  my $buffer = undef;
+  my $num    = read($FH, $buffer, $len);
+  return unpack 'C*', $buffer;         # An unsigned char (octet) value.
+}
+
+# Parse and return signed short (integer) number, default 2 bytes
+sub _readSignedShort {
+  my $len    = shift || LENGTH_OF_SHORT;
+  my $buffer = undef;
+  my $num    = read($FH, $buffer, $len);
+  return ($is_little_endian)
+    ? unpack 's*', reverse $buffer
+    : unpack 's*', $buffer;
+}
+
+# Parse and return short (integer) number, default 2 bytes
+sub _readShort {
+  my $len    = shift || LENGTH_OF_SHORT;
+  my $buffer = undef;
+  my $num    = read($FH, $buffer, $len);
+  return ($is_little_endian)
+    ? unpack 'S*', reverse $buffer
+    : unpack 'S*', $buffer;
+}
+
 # Parse and return integer number, default 2 bytes
 sub _readInt {
-  my $len = shift || LENGTH_OF_INTEGER;
+  my $len    = shift || LENGTH_OF_INTEGER;
   my $buffer = undef;
-  my $num = read($FH, $buffer, $len);
-  return unpack 'C*', reverse $buffer;
+  my $num    = read($FH, $buffer, $len);
+  return ($is_little_endian)
+    ? unpack 'C*', reverse $buffer
+    : unpack 'C*', $buffer;
 }
 
 # Parse and return long integer number, default 4 bytes
 sub _readLong {
-  my $len = shift || LENGTH_OF_LONG;
+  my $len    = shift || LENGTH_OF_LONG;
   my $buffer = undef;
-  my $num = read($FH, $buffer, $len);
-  return unpack 'C*', reverse $buffer;
+  my $num    = read($FH, $buffer, $len);
+  return ($is_little_endian)
+    ? unpack 'C*', reverse $buffer
+    : unpack 'C*', $buffer;
 }
 
 # Parse and return floating point number: default 8 bytes
 sub _readFloat {
-  my $len = shift || LENGTH_OF_FLOAT;
+  my $len    = shift || LENGTH_OF_FLOAT;
   my $buffer = undef;
-  my $num = read($FH, $buffer, $len);
-  return unpack 'd*', reverse $buffer;
+  my $num    = read($FH, $buffer, $len);
+  return ($is_little_endian)
+    ? unpack 'd*', reverse $buffer
+    : unpack 'd*', $buffer;
 }
 
 #################################
 
 ### Functions that gets data and creates XML output
 
-# Get next boolean element. Return the element's value. Add XML node
-# if in XML mode
+# Get next boolean element. Return 1 if the element's value is
+# non-zero, otherwise 0. Add XML node if in XML mode.
 sub _getBool {
   my $name = shift;
   my $value = _readBytes(1);
+
+  if ($value !~ qr/^[01]$/) {
+    my $orgval = $value;
+    $value = ($value) ? 1 : 0;
+    $log->warn(qq{Unexpected boolean value '$orgval' was converted to $value}) if $log->is_warn();
+  }
+
   _addXMLElem('boolean', $name, $value);
   return $value;
 }
@@ -306,6 +353,52 @@ sub _getFloat {
   my $name = shift;
   my $value = _readFloat();
   _addXMLElem('number', $name, $value); # Yes it's called number, not float
+  return $value;
+}
+
+# Return a date object - create XML
+sub _getDate {
+  my $name = shift;
+
+  # Date consists of a float (8 bytes) value followed by a signed short (2
+  # bytes) UTC offset
+  my $msec      = _readFloat();
+	my $utcoffset = - _readSignedShort(2) / 60;
+  $log->debug(qq{msec:$msec utcoffset:$utcoffset}) if $log->is_debug();
+
+  # Create datetime object starting on Jan 1st 1970 and add msec to
+  # get the given date
+  my $dt = DateTime->from_epoch( epoch => 0 )->add( seconds => $msec / 1000 );
+
+  $writer->comment("DateObject:Milliseconds Count From Jan. 1, 1970; Timezone UTC + Offset.")
+    if $writer;
+  $writer->startTag(
+    'data',
+    'type'      => 'date',
+    'name'      => $name,
+    'msec'      => $msec,
+    'date'      => $dt->ymd() . q{ } . $dt->hms(),
+    'utcoffset' => $utcoffset,
+  ) if $writer;
+  $writer->endTag() if $writer;
+
+  my $retval = undef;
+  {
+    no warnings q{uninitialized}; # allow undef values
+    $log->debug(qq{date;$msec;$utcoffset}) if $log->is_debug();
+    $retval = qq{date;$msec;$utcoffset};
+  }
+  return $retval;
+}
+
+# Return a pointer.  The value read indicates the element index of the
+# element pointed to.
+sub _getPointer {
+  my $name = shift;
+
+  my $value =_readShort();
+  $log->debug(qq{name:$name value:$value}) if $log->is_debug();
+  _addXMLElem('pointer', $name, $value); # Yes it's called number, not float
   return $value;
 }
 
@@ -351,7 +444,7 @@ sub _getElem {
 
   # Read element length and name
   my $name = _readString(_readInt(2));
-	#$log->debug(qq{element name:$name}) if $log->is_debug();
+  #$log->debug(qq{element name:$name}) if $log->is_debug();
 
   # Read data type and value
   my ($type, $value) = _getTypeAndValue($name);
@@ -373,7 +466,6 @@ sub _getElem {
       return qq{$name;$type;$value};
     }
   }
-
 }
 
 # parse file and return contents as a textual list
@@ -397,7 +489,7 @@ sub to_text {
 
   # Read data elements
   while (eof($FH) != 1) {
-		$log->debug(q{read element}) if $log->is_debug();
+    $log->debug(q{read element}) if $log->is_debug();
     my $string = _getElem();
     push @retvals, $string;
   }
@@ -436,7 +528,7 @@ sub to_xml {
 
   # Read data elements
   while (eof($FH) != 1) {
-		$log->debug(q{read element}) if $log->is_debug();
+    $log->debug(q{read element}) if $log->is_debug();
     my ($name, $type, $value) = _getElem();
   }
 
@@ -495,8 +587,14 @@ representing the file's content.
 
 =head1 SOL DATA FORMAT
 
-The SOL files use a binary encoding.  It consists of a header and any
-number of elements.  Both header and the elements have variable lengths.
+The SOL files use a binary encoding that are I<little-endian>
+regardless of platform architecture. This means the SOL files are
+platform independent, but they have to be interpreted differently on
+I<little-endian> and I<big-endian> platforms.  See L<perlport> for
+more.
+
+It consists of a header and any number of elements.  Both header and
+the elements have variable lengths.
 
 =head2 Header
 
@@ -538,7 +636,10 @@ Each element has the following structure:
 
 =head1 TODO
 
-=head2 Add support for datatypes I<date> and I<doublestring>.
+=head2 Pointer
+
+Resolve the value of object being pointed at for datatype
+I<pointer> (instead of index).
 
 =head1 BUGS
 
@@ -578,6 +679,8 @@ L<http://search.cpan.org/dist/Parse-Flash-Cookie>
 
 =head1 SEE ALSO
 
+=head2 L<perlport>
+
 =head2 Local Shared Object
 
 http://en.wikipedia.org/wiki/Local_Shared_Object
@@ -587,6 +690,9 @@ http://en.wikipedia.org/wiki/Local_Shared_Object
 http://sourceforge.net/docman/?group_id=131628
 
 =head1 ALTERNATIVE IMPLEMENTATIONS
+
+http://objection.mozdev.org/ (Firefox extension, Javascript, by Trevor
+Hobson)
 
 http://www.sephiroth.it/python/solreader.php (PHP, by Alessandro
 Crugnola)

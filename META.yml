@@ -1,15 +1,18 @@
 --- #YAML:1.0
 name:                Parse-Flash-Cookie
-version:             0.03
+version:             0.04
 abstract:            A flash cookie parser.
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.36
 distribution_type:   module
 requires:     
+    Config:                        0
+    DateTime:                      0
     File::Spec::Functions:         0
     Log::Log4perl:                 0
     Test::Differences:             0
     Test::More:                    0
+    Test::Strict:                  0
     URI::Escape:                   0
     XML::Writer:                   0
 meta-spec:

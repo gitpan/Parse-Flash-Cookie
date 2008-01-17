@@ -1,12 +1,12 @@
 #!perl -T
 
-#   $Id: 03-to_xml.t 66 2007-12-30 14:36:36Z aff $
+#   $Id: 03-to_xml.t 115 2008-01-17 08:29:43Z aff $
 
 use warnings;
 use strict;
 
 use File::Spec::Functions;
-use Test::More tests => 41;
+use Test::More tests => 53;
 use lib qw( lib );
 
 my $datadir      = q{data};  # test files
@@ -31,6 +31,11 @@ ok(1);
    'v3_PerfComp.sol' => qr|<sol name="v3_PerfComp" created_by="Parse::Flash::Cookie" version="\d+\.\d+">\s*<data type="object" name="counts">\s*<data type="number" name="st159758330864144014">6</data>\s*<data type="number" name="st159773247285563022">4</data>\s*<data type="number" name="st159774106279022222">5</data>\s*</data>\s*<data type="object" name="timestamps">\s*<data type="number" name="st159758330864144014">1161599020564</data>\s*<data type="number" name="st159773247285563022">1161599713693</data>\s*<data type="number" name="st159774106279022222">1161600321118</data>\s*</data>\s*<data type="object" name="totalListeningTimes">\s*<data type="number" name="st159758330864144014">7801549</data>\s*<data type="number" name="st159773247285563022">595251</data>\s*<data type="number" name="st159774106279022222">1711777</data>\s*</data>\s*<data type="object" name="lastListeningTimestamps">\s*<data type="number" name="st159758330864144014">1161599715935</data>\s*<data type="number" name="st159773247285563022">1161600323067</data>\s*<data type="number" name="st159774106279022222">1161602049881</data>\s*</data>\s*<data type="number" name="routeid">1161588196700</data>\s*<data type="number" name="routeExpiration">1161616450212</data>\s*</sol>\s*|s,
    'v4_UserCredentials.sol' => qr|<sol name="v4_UserCredentials" created_by="Parse::Flash::Cookie" version="\d+\.\d+">\s*<data type="string" name="username">foo\@bar.com</data>\s*<data type="string" name="password">qwerty</data>\s*</sol>\s*|s,
    'video.sol' => qr|<sol name="video" created_by="Parse::Flash::Cookie" version="\d+\.\d+">\s*<data type="boolean" name="soundmuted">0</data>\s*</sol>\s*|s,
+   'base_test.sol'  => qr|<sol name="test" created_by="Parse::Flash::Cookie" version="\d+\.\d+">\s*<data type="number" name="\+Infinity">inf</data>\s*<data type="number" name="-Infinity">-inf</data>\s*<data type="boolean" name="tBoolean">1</data>\s*<data type="boolean" name="fBoolean">0</data>\s*<data type="boolean" name="eBoolean">1</data>\s*<!-- DateObject:Milliseconds Count From Jan. 1, 1970; Timezone UTC \+ Offset. -->\s*<data type="date" name="Date" msec="1212359634000" date="2008-06-01 22:33:31" utcoffset="-9"></data>\s*</sol>\s*|s,
+  # expected output from wrong_size.sol equals base_test.sol
+  'wrong_size.sol'  => qr|<sol name="test" created_by="Parse::Flash::Cookie" version="\d+\.\d+">\s*<data type="number" name="\+Infinity">inf</data>\s*<data type="number" name="-Infinity">-inf</data>\s*<data type="boolean" name="tBoolean">1</data>\s*<data type="boolean" name="fBoolean">0</data>\s*<data type="boolean" name="eBoolean">1</data>\s*<!-- DateObject:Milliseconds Count From Jan. 1, 1970; Timezone UTC \+ Offset. -->\s*<data type="date" name="Date" msec="1212359634000" date="2008-06-01 22:33:31" utcoffset="-9"></data>\s*</sol>\s*|s,
+   'pointer.sol'  => qr|<sol name="test" created_by="Parse::Flash::Cookie" version="\d+\.\d+">\s*<data type="pointer" name="Pointer">2</data>\s*<data type="array" length="2" name="Array">\s*<data type="number" name="\+Infinity">inf</data>\s*<data type="number" name="-Infinity">-inf</data>\s*</data>\s*<data type="object" name="Object">\s*<data type="boolean" name="tBoolean">1</data>\s*<data type="boolean" name="fBoolean">0</data>\s*<data type="boolean" name="eBoolean">1</data>\s*</data>\s*<!-- DateObject:Milliseconds Count From Jan. 1, 1970; Timezone UTC \+ Offset. -->\s*<data type="date" name="Date" msec="1199984394000" date="2008-01-10 16:59:31" utcoffset="-9"></data>\s*</sol>\s*|s,
+   'fpv.sol' => qr|\s*<sol name="fpv" created_by="Parse::Flash::Cookie" version="\d+\.\d+">\s*<!-- DateObject:Milliseconds Count From Jan. 1, 1970; Timezone UTC \+ Offset. -->\s*<data type="date" name="ptrak" msec="1160858844461" date="2006-10-14 20:47:01" utcoffset="2"></data>\s*</sol>|s,
 );
 
 # Use sort to create test in a predictable sequence

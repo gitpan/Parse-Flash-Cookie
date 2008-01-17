@@ -5,9 +5,12 @@ README
 data/A_Browser.sol
 data/Synergy_Area.sol
 data/TestMovie_Config_Info.sol
+data/base_test.sol
 data/clearspring.sol
+data/fpv.sol
 data/lastPart.sol
 data/mediaPlayerUserSettings.sol
+data/pointer.sol
 data/revverplayer.sol
 data/settings.sol
 data/soundData.sol
@@ -15,6 +18,7 @@ data/v3_Machine.sol
 data/v3_PerfComp.sol
 data/v4_UserCredentials.sol
 data/video.sol
+data/wrong_size.sol
 lib/Parse/Flash/Cookie.pm
 t/00-load.t
 t/01-nofile.t
@@ -23,4 +27,5 @@ t/03-to_xml.t
 t/boilerplate.t
 t/pod-coverage.t
 t/pod.t
+t/strict.t
 META.yml                                 Module meta-data (added by MakeMaker)
