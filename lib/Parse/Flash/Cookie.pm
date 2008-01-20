@@ -1,11 +1,11 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 128 2008-01-17 13:27:57Z aff $
+#   $Id: Cookie.pm 141 2008-01-20 21:40:57Z aff $
 
 use strict;
 use warnings;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 use Log::Log4perl;
 use XML::Writer;   # to create XML output
@@ -298,9 +298,7 @@ sub _readInt {
   my $len    = shift || LENGTH_OF_INTEGER;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
-  (_is_little_endian())
-    ? return unpack 'C*', reverse $buffer
-    : return unpack 'C*', $buffer;
+  return unpack 'C*', reverse $buffer;
 }
 
 # Parse and return long integer number, default 4 bytes
@@ -308,9 +306,7 @@ sub _readLong {
   my $len    = shift || LENGTH_OF_LONG;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
-  (_is_little_endian())
-    ? return unpack 'C*', reverse $buffer
-    : return unpack 'C*', $buffer;
+  return unpack 'C*', reverse $buffer;
 }
 
 # Parse and return floating point number: default 8 bytes
