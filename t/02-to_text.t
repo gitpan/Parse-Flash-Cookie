@@ -1,20 +1,17 @@
 #!perl -T
 
-#   $Id: 02-to_text.t 139 2008-01-20 21:19:53Z aff $
+#   $Id: 02-to_text.t 147 2008-01-29 17:25:32Z aff $
 
 use warnings;
 use strict;
 
-use Math::BigFloat;
 use File::Spec::Functions;
 use Test::More tests => 47;
 use Test::Differences;
 use lib qw( lib );
 
-my $inf          = Math::BigFloat->binf();    # $inf contains: "inf"
-my $datadir      = q{data};                   # test files
+my $datadir      = q{data};  # test files
 my %file2content = ();
-my %todofile = ();    # files with features that are noy yet implmemented
 
 BEGIN { use_ok('Parse::Flash::Cookie') }
 use Parse::Flash::Cookie;
@@ -37,8 +34,8 @@ ok(1);
     'v3_PerfComp.sol'             => [qw(v3_PerfComp counts;object;st159758330864144014;6,st159773247285563022;4,st159774106279022222;5 timestamps;object;st159758330864144014;1161599020564,st159773247285563022;1161599713693,st159774106279022222;1161600321118 totalListeningTimes;object;st159758330864144014;7801549,st159773247285563022;595251,st159774106279022222;1711777 lastListeningTimestamps;object;st159758330864144014;1161599715935,st159773247285563022;1161600323067,st159774106279022222;1161602049881 routeid;number;1161588196700 routeExpiration;number;1161616450212)],
     'v4_UserCredentials.sol'      => [qw (v4_UserCredentials username;string;foo@bar.com password;string;qwerty )],
     'video.sol'                   => [qw(video soundmuted;boolean;0)],
-		'wrong_size.sol' => ['test',qq{+Infinity;number;$inf},qq{-Infinity;number;-$inf},'tBoolean;boolean;1','fBoolean;boolean;0','eBoolean;boolean;1','Date;date;date;1212359634000;-9'],
-    'base_test.sol' => ['test',qq{+Infinity;number;$inf},qq{-Infinity;number;-$inf},'tBoolean;boolean;1','fBoolean;boolean;0','eBoolean;boolean;1','Date;date;date;1212359634000;-9'
+		'wrong_size.sol' => ['test',qq{+Infinity;number;inf},qq{-Infinity;number;-inf},'tBoolean;boolean;1','fBoolean;boolean;0','eBoolean;boolean;1','Date;date;date;1212359634000;-9'],
+    'base_test.sol' => ['test',qq{+Infinity;number;inf},qq{-Infinity;number;-inf},'tBoolean;boolean;1','fBoolean;boolean;0','eBoolean;boolean;1','Date;date;date;1212359634000;-9'
 ],
   );
 }

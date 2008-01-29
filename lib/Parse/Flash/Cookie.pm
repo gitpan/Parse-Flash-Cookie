@@ -1,11 +1,11 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 141 2008-01-20 21:40:57Z aff $
+#   $Id: Cookie.pm 151 2008-01-29 17:29:55Z aff $
 
 use strict;
 use warnings;
 
-our $VERSION = '0.06';
+our $VERSION = '0.07';
 
 use Log::Log4perl;
 use XML::Writer;   # to create XML output
@@ -18,6 +18,12 @@ use constant LENGTH_OF_INTEGER => 2;
 use constant LENGTH_OF_LONG    => 4;
 use constant LENGTH_OF_FLOAT   => 8;
 use constant END_OF_OBJECT     => "\x00\x00\x09";
+
+# The below constants are little-endian.  Adobe flash cookies are
+# little-endian even on big-endian platforms.
+use constant POSITIVE_INFINITY => "\x7F\xF0\x00\x00\x00\x00\x00\x00";
+use constant NEGATIVE_INFINITY => "\xFF\xF0\x00\x00\x00\x00\x00\x00";
+use constant NOT_A_NUMBER      => "\x7F\xF8\x00\x00\x00\x00\x00\x00";
 
 my $conf = q(
   log4perl.category.sol.parser             = WARN, ScreenAppender
@@ -314,6 +320,17 @@ sub _readFloat {
   my $len    = shift || LENGTH_OF_FLOAT;
   my $buffer = undef;
   my $num    = read($FH, $buffer, $len);
+
+	# Check special numbers - do not rely on OS/compiler to tell the
+	# truth.  
+	if ($buffer eq POSITIVE_INFINITY) {
+		return q{inf};
+	} elsif ($buffer eq NEGATIVE_INFINITY) {
+		return q{-inf};
+	} elsif ($buffer eq NOT_A_NUMBER) {
+		return q{nan};
+	}
+	
   (_is_little_endian())
     ? return unpack 'd*', reverse $buffer
     : return unpack 'd*', $buffer;

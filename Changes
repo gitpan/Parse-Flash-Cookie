@@ -1,9 +1,13 @@
 Revision history for Parse-Flash-Cookie
 
-#   $Id: Changes 143 2008-01-20 21:42:16Z aff $
+#   $Id: Changes 149 2008-01-29 17:28:54Z aff $
+
+0.07    2008-01-29
+        Explicit convertion of inf, -inf and NaN regardless of 
+        OS/compiler.
 
 0.06    2008-01-20
-        Read int and long as little-endian regardless of platform
+        Read int and long as little-endian regardless of platform.
         Patch by Almut Behrens.
 
 0.05    2008-01-17
