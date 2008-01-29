@@ -1,6 +1,6 @@
 #!perl -T
 
-#   $Id: 03-to_xml.t 148 2008-01-29 17:26:28Z aff $
+#   $Id: 03-to_xml.t 154 2008-01-29 20:05:06Z aff $
 
 use warnings;
 use strict;
@@ -9,13 +9,14 @@ use File::Spec::Functions;
 use Test::More;
 use lib qw( lib );
 
-eval "use XML::Writer";
-if ($@) {
-	plan skip_all => "XML::Writer required for testing xml" if $@;
-} else {
-	plan tests => 61;
+BEGIN {
+  eval "use XML::Writer";
+  if ($@) {
+    plan skip_all => "XML::Writer required for testing xml" if $@;
+  } else {
+    plan tests => 62;
+  }
 }
-
 
 my $datadir      = q{data};  # test files
 my %file2content = ();

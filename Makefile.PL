@@ -1,4 +1,4 @@
-#   $Id: Makefile.PL 145 2008-01-29 17:20:03Z aff $
+#   $Id: Makefile.PL 154 2008-01-29 20:05:06Z aff $
 
 use strict;
 use warnings;
@@ -6,7 +6,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
   NAME          => 'Parse::Flash::Cookie',
-  VERSION       => 0.07,
+  VERSION       => 0.08,
   AUTHOR        => 'Andreas Faafeng <aff@cpan.org>',
   VERSION_FROM  => 'lib/Parse/Flash/Cookie.pm',
   ABSTRACT_FROM => 'lib/Parse/Flash/Cookie.pm',

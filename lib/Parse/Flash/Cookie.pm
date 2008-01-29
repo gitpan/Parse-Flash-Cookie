@@ -1,11 +1,11 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 151 2008-01-29 17:29:55Z aff $
+#   $Id: Cookie.pm 154 2008-01-29 20:05:06Z aff $
 
 use strict;
 use warnings;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 use Log::Log4perl;
 use XML::Writer;   # to create XML output
