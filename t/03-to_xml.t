@@ -1,7 +1,5 @@
 #!perl -T
 
-#   $Id: 03-to_xml.t 154 2008-01-29 20:05:06Z aff $
-
 use warnings;
 use strict;
 

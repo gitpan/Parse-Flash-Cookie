@@ -1,7 +1,5 @@
 #!perl -T
 
-#   $Id: pod-coverage.t 32 2007-12-19 13:25:33Z aff $
-
 use strict;
 use warnings;
 use Test::More;

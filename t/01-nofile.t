@@ -1,7 +1,5 @@
 #!perl -T
 
-#   $Id: 01_nofile.t 32 2007-12-19 13:25:33Z aff $
-
 use warnings;
 use strict;
 

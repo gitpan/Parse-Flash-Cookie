@@ -1,7 +1,5 @@
 # strict.t
 
-#   $Id: strict.t 130 2008-01-17 13:36:22Z aff $
-
 use warnings;
 use strict;
 use Test::More;

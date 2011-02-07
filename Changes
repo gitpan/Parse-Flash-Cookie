@@ -1,6 +1,8 @@
 Revision history for Parse-Flash-Cookie
 
-#   $Id: Changes 154 2008-01-29 20:05:06Z aff $
+0.09    2011-02-07
+        Added LICENSE => perl to Makefile.PL.  
+        Added SOL version 3 detection (parsing not supported yet).
 
 0.08    2008-01-29
         Fix for Test::More version 0.74        

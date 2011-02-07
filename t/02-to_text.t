@@ -1,7 +1,5 @@
 #!perl -T
 
-#   $Id: 02-to_text.t 147 2008-01-29 17:25:32Z aff $
-
 use warnings;
 use strict;
 

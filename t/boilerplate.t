@@ -1,7 +1,5 @@
 #!perl -T
 
-#   $Id: boilerplate.t 32 2007-12-19 13:25:33Z aff $
-
 use strict;
 use warnings;
 use Test::More tests => 3;
@@ -50,4 +48,6 @@ not_in_file_ok(Changes =>
 
 
 module_boilerplate_ok('lib/Parse/Flash/Cookie.pm');
+
+__END__
 

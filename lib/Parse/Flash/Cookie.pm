@@ -1,11 +1,10 @@
 package Parse::Flash::Cookie;
 
-#   $Id: Cookie.pm 154 2008-01-29 20:05:06Z aff $
-
+use 5.008;    # minimum Perl is V5.8.0
 use strict;
 use warnings;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 use Log::Log4perl;
 use XML::Writer;   # to create XML output
@@ -446,9 +445,14 @@ sub _getHeader {
   my $name = _readString(_readInt(1));
   $log->debug("name:$name") if $log->is_debug();
 
-  # Skip next 4 bytes
-  $log->debug(q{header: skip next 4 bytes}) if $log->is_debug();
-  _readString(4);
+  # Read version number
+  my $version =_readLong();
+  $log->debug(qq{header: version:'$version'}) if $log->is_debug();
+
+  # TODO: Add support for version 3 sol files
+  if ($version != 0) {
+      $log->logdie(qq{SOL version '$version' is unsupported!}) if $log->is_debug();
+  }
 
   return $name; # ok
 }
